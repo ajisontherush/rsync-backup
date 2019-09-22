@@ -6,6 +6,7 @@ v0.1
 + FIX: /tmp/donotsleeponlidclose doesn't work on systemd
 	systemctl mask suspend.target should work
 - move rtc wake configuration to jobfile
+- drop all job vars before loading jobfile
 
 v0.2
 - add backup rotation function

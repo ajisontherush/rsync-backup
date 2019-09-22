@@ -52,14 +52,14 @@ backup () {
 	systemctl mask suspend.target
 	EXCLUDELIST=""
 	for EXCLUDEPATH in ${EXCLUDES[*]}; do
-		log-debug "Excluded path: $EXCLUDEPATH"
+		log-verbose "DEBUG: Excluded path: $EXCLUDEPATH"
 		EXCLUDELIST="$EXCLUDELIST --exclude $EXCLUDEPATH"
 	done
 	BDATE=$(date +%Y-%m-%d-%H-%M-%S)
-	log-debug "DEBUG: Backup date is $BDATE"
-	log-debug "DEBUG: Running rsync"
-	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$RSYNC" "$BACKUPPATH" "$USER@$SERVER:$SERVERROOT/$JOBNAME/$BDATE/" ; then
-		log-debug "DEBUG: sshing to renew symlink"
+	log-verbose "DEBUG: Backup date is $BDATE"
+	log-verbose "DEBUG: Running rsync"
+	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$REMOTERSYNCPATH" "$BACKUPPATH" "$USER@$SERVER:$SERVERROOT/$JOBNAME/$BDATE/" ; then
+		log-verbose "DEBUG: sshing to renew symlink"
 		ssh "$USER@$SERVER" "cd $ROOT/$JOBNAME; rm current; ln -sf $BDATE current"
 	else
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
@@ -72,26 +72,26 @@ check-binaries
 
 if journalctl -S "10 mins ago" | grep "Waking up from system sleep state S3" >/dev/null; then
 	WAKEDBYRTC=1
-	log-debug "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC"
+	log-verbose "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC"
 else
-	log-debug "DEBUG: RTC is not the case of wakeup"
+	log-verbose "DEBUG: RTC is not the case of wakeup"
 fi
 
 for JOBFILE in ${JOBFILES[*]}; do
 	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file"  ; exit 1 ; }
 	source-jobfile $JOBFILE
-	if ping -c 1 "$SERVER" >/dev/null; then log-debug "server online"
+	if ping -c 1 "$SERVER" >/dev/null; then log-verbose "server online"
 	if backup; then log "INFO: $BACKUBJOB backup ended without errors"
 	else log "there was errors during backup"; fi
-	else log-debug "INFO: server did not respond our ping - assuming offline"; fi
-	log-debug "setting RTC alarm back"
+	else log-verbose "INFO: server did not respond our ping - assuming offline"; fi
+	log-verbose "setting RTC alarm back"
 done
 
 if [[ $(date +%_H) -lt 2 ]]; then
-	log-debug "earlier than 4 am - setting on today 2 am"
+	log-verbose "earlier than 4 am - setting on today 2 am"
 	rtcwake -t $(date +%s --date="today 2:01") -m no
 else
-	log-debug "after  4 am - setting on tomorrow 2 am"
+	log-verbose "after  4 am - setting on tomorrow 2 am"
 	rtcwake -t $(date +%s --date="tomorrow 2:01") -m no
 fi
 
