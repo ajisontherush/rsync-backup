@@ -1,0 +1,72 @@
+#!/bin/bash
+
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+DEBUG=1
+ID=$(hostname)-fc30
+USER=root
+SERVER=fs.lan
+RSYNC="/usr/bin/rsync"
+ROOT=/home/aj/backup/
+EXCLUDES=( tmp proc sys run dev home/aj/Documents home/aj/Photos home/aj/Pictures home/aj/Profile )
+
+
+log () {
+logger -t backup $@
+}
+
+log-debug () {
+	if [ $DEBUG ]; then
+		log -t backup *DEBUG* $@
+	fi
+}
+
+backup () {
+	log "Starting backup"
+	EXCLUDELIST=""
+	for EXCLUDEPATH in ${EXCLUDES[*]}; do
+		log-debug "Excluded path: $EXCLUDEPATH"
+		EXCLUDELIST="$EXCLUDELIST --exclude $EXCLUDEPATH"
+	done
+	BDATE=$(date +%Y-%m-%d-%H-%M-%S)
+	log-debug "Backup date is $BDATE"
+	log-debug "running rsync"
+	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$RSYNC" / "$USER@$SERVER:$ROOT/$ID/$BDATE/" ; then
+		log-debug "sshing to renew symlink"
+		ssh $USER@$SERVER "cd $ROOT/$ID; rm current; ln -sf $BDATE current"
+	else
+		log-debug "something wrong with rsync"
+	fi
+
+}
+
+log 'starting backup'
+touch /tmp/donotsleeponlidclose
+if journalctl -b | grep "Waking up from system sleep state S3" | tail -n 1 | grep " 04" >/dev/null; then
+	WAKEDBYRTC=1
+	log-debug "seems to be waked by RTC, setting var WAKEDBYRTC"
+else log-debug "RTC is not the case of wakeup"; fi
+if ping -c 1 "$SERVER" >/dev/null; then log-debug "server online"
+	if backup; then log "backup ended without errors"
+	else log "there was errors during backup"; fi
+else log-debug "server did not respond our ping - assuming offline"; fi
+log-debug "setting RTC alarm back"
+
+if [[ $(date +%_H) -lt 2 ]]; then
+	log-debug "earlier than 4 am - setting on today 2 am"
+	rtcwake -t $(date +%s --date="today 2:01") -m no
+else
+	log-debug "after  4 am - setting on tomorrow 2 am"
+	rtcwake -t $(date +%s --date="tomorrow 2:01") -m no
+fi
+
+if [[ $WAKEDBYRTC ]]; then
+	log-debug "waked up by RTC - going to sleep in 5 seconds"
+	rm /tmp/donotsleeponlidclose
+	sh -c "sleep 5; systemctl suspend" &
+fi
+log "backup ended"
+rm /tmp/donotsleeponlidclose
+
+if cat /proc/acpi/button/lid/LID/state|grep closed > /dev/null; then
+	sh -c "sleep 5; systemctl suspend" & 
+fi
