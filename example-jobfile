@@ -1,0 +1,20 @@
+# rsync-backup example jobfile
+
+# JOBNAME will be used as folder name on remote host
+JOBNAME="backup-$(hostname)"
+
+# Remote host name 
+SERVER="fs.lan"
+# This user well be used to connect to remote host
+USER="root"
+# Path to make backup to
+SERVERROOT="/home/backup/"
+# Path to rsync binary on remote host
+REMOTERSYNCPATH="/usr/bin/rsync"
+
+# What to backup
+BACKUPPATH="/"
+EXCLUDES=( tmp proc sys run dev home/aj/Documents home/aj/Photos home/aj/Pictures home/aj/Profile )
+
+# Debug messages
+RSYNC-BACKUP-DEBUG=1
