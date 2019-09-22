@@ -1,23 +1,17 @@
 #!/bin/bash
 
-PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
-DEBUG=1
-ID=$(hostname)-fc30
-USER=root
-SERVER=fs.lan
-RSYNC="/usr/bin/rsync"
-ROOT=/home/aj/backup/
-EXCLUDES=( tmp proc sys run dev home/aj/Documents home/aj/Photos home/aj/Pictures home/aj/Profile )
-
-
 log () {
-logger -t backup $@
+	logger -t rsync-backup $@
 }
 
 log-debug () {
-	if [ $DEBUG ]; then
+	if [ $RSYNC-BACKUP-DEBUG ]; then
 		log -t backup *DEBUG* $@
 	fi
+}
+
+source-jobfile () {
+	[ -f $@ ] && . $@ || log "ERROR: cannot read jobfile: $@" && exit 127 
 }
 
 backup () {
@@ -30,7 +24,7 @@ backup () {
 	BDATE=$(date +%Y-%m-%d-%H-%M-%S)
 	log-debug "Backup date is $BDATE"
 	log-debug "running rsync"
-	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$RSYNC" / "$USER@$SERVER:$ROOT/$ID/$BDATE/" ; then
+	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$RSYNC" "$BACKUPPATH" "$USER@$SERVER:$SERVERROOT/$JOBNAME/$BDATE/" ; then
 		log-debug "sshing to renew symlink"
 		ssh $USER@$SERVER "cd $ROOT/$ID; rm current; ln -sf $BDATE current"
 	else
@@ -39,7 +33,8 @@ backup () {
 
 }
 
-log 'starting backup'
+
+source-jobfile $@
 touch /tmp/donotsleeponlidclose
 if journalctl -b | grep "Waking up from system sleep state S3" | tail -n 1 | grep " 04" >/dev/null; then
 	WAKEDBYRTC=1

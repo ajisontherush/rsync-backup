@@ -1,7 +1,9 @@
 v0.1
-- move config options out of main script
-- make sample config file
++ move config options out of main script
+- make sample config (job description) file
 - make checks on needed binaries
+- FIX: /tmp/donotsleeponlidclose doesn't work on systemd
+- add backup rotation function
 
 v0.2
 - make use of sudo on remote machine
