@@ -1,0 +1,8 @@
+v0.1
+- move config options out of main script
+- make sample config file
+- make checks on needed binaries
+
+v0.2
+- make use of sudo on remote machine
+- make restore script
