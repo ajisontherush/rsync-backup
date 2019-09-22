@@ -17,4 +17,4 @@ BACKUPPATH="/"
 EXCLUDES=( tmp proc sys run dev home/aj/Documents home/aj/Photos home/aj/Pictures home/aj/Profile )
 
 # Debug messages
-RSYNC-BACKUP-DEBUG=1
+RSYNC_BACKUP_DEBUG=1

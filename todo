@@ -1,10 +1,13 @@
 v0.1
 + move config options out of main script
-- make sample config (job description) file
-- make checks on needed binaries
-- FIX: /tmp/donotsleeponlidclose doesn't work on systemd
-- add backup rotation function
++ make sample config (job description) file
++ make checks on needed binaries
++ parse commandline arguments
++ FIX: /tmp/donotsleeponlidclose doesn't work on systemd
+	systemctl mask suspend.target should work
+- move rtc wake configuration to jobfile
 
 v0.2
+- add backup rotation function
 - make use of sudo on remote machine
 - make restore script

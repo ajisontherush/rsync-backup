@@ -1,50 +1,91 @@
 #!/bin/bash
 
-log () {
-	logger -t rsync-backup $@
+usage () {
+	echo "usage: $0 [-cv] jobfile1 [jobfile2] ..."
+	echo ""
+	echo "-c | --cron     log to syslog, no output"
+	echo "-v | --debug    verbose logging"
+	echo "-h | --help     print usage summary"
+	echo ""
 }
 
-log-debug () {
-	if [ $RSYNC-BACKUP-DEBUG ]; then
-		log -t backup *DEBUG* $@
-	fi
+parse-arguments () {
+	JOBFILES=()
+	while [[ $# -gt 0 ]]; do
+    ARG="$1"
+    case "$ARG" in
+			-c|--cron) RSYNC_BACKUP_SYSLOG=1 ;;
+			-v|--debug) RSYNC_BACKUP_DEBUG=1 ;;
+			-h|--help) usage ; exit 0 ;;
+			*) JOBFILES+=( "$ARG" ) ;;
+		esac
+	shift
+done
+}
+
+log () {
+	[ -z "$RSYNC_BACKUP_SYSLOG" ] && echo "$@" || logger -t rsync-backup "$@" 
+}
+
+log-verbose () {
+	[ -z "$RSYNC_BACKUP_DEBUG" ] || log "$@"
+}
+
+check-binaries () {
+	command -v ssh >/dev/null 2>&1 && log-verbose "INFO: found ssh: $(command -v ssh)" || { log "ERROR: cannot find ssh, exiting" ; exit 1 ; } 
+	command -v rsync >/dev/null 2>&1 && log-verbose "INFO: found rsync: $(command -v rsync)" || { log "ERROR: cannot find rsync, exiting" ; exit 1 ; }
 }
 
 source-jobfile () {
-	[ -f $@ ] && . $@ || log "ERROR: cannot read jobfile: $@" && exit 127 
+	[ -f $@ ] && . $@ >/dev/null 2>&1 || { log "ERROR: cannot read jobfile: $@" && exit 1; }
+	[ -z "$JOBNAME" ] && { log "ERROR: JOBNAME not set, check $@" && exit 1; }
+	[ -z "$SERVER" ] && { log "ERROR: SERVER not set, check $@" && exit 1; }
+	[ -z "$USER" ] && { log "ERROR: USER not set, check $@" && exit 1; }
+	[ -z "$SERVERROOT" ] && { log "ERROR: SERVERROOT not set, check $@" && exit 1; }
+	[ -z "$REMOTERSYNCPATH" ] && { log "ERROR: REMOTERSYNCPATH not set, check $@" && exit 1; }
+	[ -z "$BACKUPPATH" ] && { log "ERROR: BACKUPPATH not set, check $@" && exit 1; }
+	[ -z "$EXCLUDES" ] && { log "ERROR: EXCLUDES not set, check $@" && exit 1; }
 }
 
 backup () {
-	log "Starting backup"
+	log "INFO: Starting backup job $JOBNAME"
+	systemctl mask suspend.target
 	EXCLUDELIST=""
 	for EXCLUDEPATH in ${EXCLUDES[*]}; do
 		log-debug "Excluded path: $EXCLUDEPATH"
 		EXCLUDELIST="$EXCLUDELIST --exclude $EXCLUDEPATH"
 	done
 	BDATE=$(date +%Y-%m-%d-%H-%M-%S)
-	log-debug "Backup date is $BDATE"
-	log-debug "running rsync"
+	log-debug "DEBUG: Backup date is $BDATE"
+	log-debug "DEBUG: Running rsync"
 	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$RSYNC" "$BACKUPPATH" "$USER@$SERVER:$SERVERROOT/$JOBNAME/$BDATE/" ; then
-		log-debug "sshing to renew symlink"
-		ssh $USER@$SERVER "cd $ROOT/$ID; rm current; ln -sf $BDATE current"
+		log-debug "DEBUG: sshing to renew symlink"
+		ssh "$USER@$SERVER" "cd $ROOT/$JOBNAME; rm current; ln -sf $BDATE current"
 	else
-		log-debug "something wrong with rsync"
+		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
 	fi
-
+	systemctl unmask suspend.target
 }
 
+[ $# -gt 0 ] && parse-arguments $@ || { usage ; exit 1 ; }
+check-binaries
 
-source-jobfile $@
-touch /tmp/donotsleeponlidclose
-if journalctl -b | grep "Waking up from system sleep state S3" | tail -n 1 | grep " 04" >/dev/null; then
+if journalctl -S "10 mins ago" | grep "Waking up from system sleep state S3" >/dev/null; then
 	WAKEDBYRTC=1
-	log-debug "seems to be waked by RTC, setting var WAKEDBYRTC"
-else log-debug "RTC is not the case of wakeup"; fi
-if ping -c 1 "$SERVER" >/dev/null; then log-debug "server online"
-	if backup; then log "backup ended without errors"
+	log-debug "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC"
+else
+	log-debug "DEBUG: RTC is not the case of wakeup"
+fi
+
+for JOBFILE in ${JOBFILES[*]}; do
+	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file"  ; exit 1 ; }
+	source-jobfile $JOBFILE
+	if ping -c 1 "$SERVER" >/dev/null; then log-debug "server online"
+	if backup; then log "INFO: $BACKUBJOB backup ended without errors"
 	else log "there was errors during backup"; fi
-else log-debug "server did not respond our ping - assuming offline"; fi
-log-debug "setting RTC alarm back"
+	else log-debug "INFO: server did not respond our ping - assuming offline"; fi
+	log-debug "setting RTC alarm back"
+done
 
 if [[ $(date +%_H) -lt 2 ]]; then
 	log-debug "earlier than 4 am - setting on today 2 am"
@@ -53,14 +94,6 @@ else
 	log-debug "after  4 am - setting on tomorrow 2 am"
 	rtcwake -t $(date +%s --date="tomorrow 2:01") -m no
 fi
-
-if [[ $WAKEDBYRTC ]]; then
-	log-debug "waked up by RTC - going to sleep in 5 seconds"
-	rm /tmp/donotsleeponlidclose
-	sh -c "sleep 5; systemctl suspend" &
-fi
-log "backup ended"
-rm /tmp/donotsleeponlidclose
 
 if cat /proc/acpi/button/lid/LID/state|grep closed > /dev/null; then
 	sh -c "sleep 5; systemctl suspend" & 
