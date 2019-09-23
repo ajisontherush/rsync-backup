@@ -2,4 +2,4 @@ rsync-backup - backup script using rsync
 
 This script is intended to run by cron on a laptop. It uses rsync's
 hardlinks functionality to minimize backup size, uploads backup as
-uncompressed filesystem on remote host and sets rtc clock for wakup
+uncompressed files on remote host and sets rtc clock for wakup
