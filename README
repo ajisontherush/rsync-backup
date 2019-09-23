@@ -3,3 +3,17 @@ rsync-backup - backup script using rsync
 This script is intended to run by cron on a laptop. It uses rsync's
 hardlinks functionality to minimize backup size, uploads backup as
 uncompressed files on remote host and sets rtc clock for wakup
+
+TODO
+
++ move config options out of main script
++ make sample config (job description) file
++ make checks on needed binaries
++ parse commandline arguments
++ FIX: /tmp/donotsleeponlidclose doesn't work on systemd
+	systemctl mask suspend.target should work
+- move rtc wake configuration to jobfile
+- drop all job vars before loading jobfile
+- add backup rotation function
+- make use of sudo on remote machine
+- make restore script
