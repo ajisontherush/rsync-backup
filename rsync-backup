@@ -60,7 +60,7 @@ backup () {
 	log-verbose "DEBUG: Running rsync"
 	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$REMOTERSYNCPATH" "$BACKUPPATH" "$USER@$SERVER:$SERVERROOT/$JOBNAME/$BDATE/" ; then
 		log-verbose "DEBUG: sshing to renew symlink"
-		ssh "$USER@$SERVER" "cd $BACKUPPATH/$JOBNAME; rm current; ln -sf $BDATE current"
+		ssh "$USER@$SERVER" "cd $SERVERROOT/$JOBNAME; rm current; ln -sf $BDATE current"
 	else
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
 	fi
