@@ -4,7 +4,7 @@ This script is intended to run by cron on a laptop. It uses rsync's
 hardlinks functionality to minimize backup size, uploads backup as
 uncompressed files on remote host and sets rtc clock for wakup
 
-TODO
+TODO ( + mark for completed)
 
 + move config options out of main script
 + make sample config (job description) file
@@ -12,6 +12,7 @@ TODO
 + parse commandline arguments
 + FIX: /tmp/donotsleeponlidclose doesn't work on systemd
 	systemctl mask suspend.target should work
++ add laptop battery charge level
 - move rtc wake configuration to jobfile
 - drop all job vars before loading jobfile
 - add backup rotation function
