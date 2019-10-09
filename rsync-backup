@@ -1,9 +1,10 @@
 #!/bin/bash
 
 usage () {
-	echo "usage: $0 [-cv] jobfile1 [jobfile2] ..."
+	echo "usage: $0 [-cvhs] jobfile1 [jobfile2] ..."
 	echo ""
 	echo "-c | --cron     log to syslog, no output"
+	echo "-d | --dry-run  simulation run"
 	echo "-v | --debug    verbose logging"
 	echo "-h | --help     print usage summary"
 	echo ""
@@ -15,6 +16,7 @@ parse-arguments () {
     ARG="$1"
     case "$ARG" in
 			-c|--cron) RSYNC_BACKUP_SYSLOG=1 ;;
+			-d|--dry-run) RSYNC_BACKUP_DRYRUN=1 ;;
 			-v|--debug) RSYNC_BACKUP_DEBUG=1 ;;
 			-h|--help) usage ; exit 0 ;;
 			*) JOBFILES+=( "$ARG" ) ;;
@@ -34,6 +36,38 @@ log-verbose () {
 check-binaries () {
 	command -v ssh >/dev/null 2>&1 && log-verbose "INFO: found ssh: $(command -v ssh)" || { log "ERROR: cannot find ssh, exiting" ; exit 1 ; } 
 	command -v rsync >/dev/null 2>&1 && log-verbose "INFO: found rsync: $(command -v rsync)" || { log "ERROR: cannot find rsync, exiting" ; exit 1 ; }
+}
+
+##### This function checks for battery charge and AC adapter state, and tries to find wakeup events
+check-powerstate () {
+	if [ -d /sys/class/power_supply/AC ] ; then
+		log-verbose "DEBUG: Found AC power supply"
+		ACONLINE=$(cat /sys/class/power_supply/AC/online)
+		if [ -d /sys/class/power_supply/BAT0 ] ; then
+			log-verbose "DEBUG: Battery BAT0 present"
+			BATTERYLEVEL=$(cat /sys/class/power_supply/BAT0/capacity)
+			log-verbose "DEBUG: BAT0: $BATTERYLEVEL%"
+		fi
+		if [ -d /sys/class/power_supply/BAT1 ] ; then
+			log-verbose "DEBUG: Battery BAT1 present"
+			BAT1CAPACITY=$(cat /sys/class/power_supply/BAT0/capacity)
+			BAT0FULLENERGY=$(cat /sys/class/power_supply/BAT0/energy_full)
+			BAT1FULLENERGY=$(cat /sys/class/power_supply/BAT1/energy_full)
+			log-verbose "DEBUG: BAT1: $BAT1CAPACITY%"
+			BATTERYLEVEL=$(( $(BAT0FULLENERGY) * $(BATTERYLEVEL) / ($(BAT0FULLENERGY) + $(BAT1FULLENERGY)) + $(BAT1FULLENERGY) * $(BAT1CAPACITY) / ($(BAT0FULLENERGY) + $(BAT1FULLENERGY)) ))
+			log-verbose "DEBUG: overall: $BATTERYLEVEL%"
+		fi
+		[[ ( "$BATTERYLEVEL" -lt "$SAVEBATTERYLEVEL" ) && ( "$ACONLINE" -gt 0 ) ]] && { log "ERROR: battery level is too low" ; exit 1 ; } 
+	else
+		log "INFO: no power supplies found"
+	fi
+	
+	if journalctl -S "10 minutes ago" | grep "Waking up from system sleep state S3" >/dev/null; then
+		WAKEDBYRTC=1
+		log-verbose "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC"
+	else
+		log-verbose "DEBUG: RTC is not the case of wakeup"
+	fi
 }
 
 source-jobfile () {
@@ -69,13 +103,7 @@ backup () {
 
 [ $# -gt 0 ] && parse-arguments $@ || { usage ; exit 1 ; }
 check-binaries
-
-if journalctl -S "10 mins ago" | grep "Waking up from system sleep state S3" >/dev/null; then
-	WAKEDBYRTC=1
-	log-verbose "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC"
-else
-	log-verbose "DEBUG: RTC is not the case of wakeup"
-fi
+check-powerstate
 
 for JOBFILE in ${JOBFILES[*]}; do
 	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file"  ; exit 1 ; }

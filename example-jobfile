@@ -16,5 +16,8 @@ REMOTERSYNCPATH="/usr/bin/rsync"
 BACKUPPATH="/"
 EXCLUDES=( tmp proc sys run dev home/aj/Documents home/aj/Photos home/aj/Pictures home/aj/Profile )
 
+# Safe battery percentage - backup will not run under this percentage
+SAVEBATTERYLEVEL=95
+
 # Debug messages
 RSYNC_BACKUP_DEBUG=1
