@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 usage () {
-	echo "usage: $0 [-cvhs] jobfile1 [jobfile2] ..."
+	echo "usage: $0 [-cdvh] jobfile1 [jobfile2] ..."
 	echo ""
 	echo "-c | --cron     log to syslog, no output"
 	echo "-d | --dry-run  simulation run"
@@ -34,8 +34,9 @@ log-verbose () {
 }
 
 check-binaries () {
-	command -v ssh >/dev/null 2>&1 && log-verbose "INFO: found ssh: $(command -v ssh)" || { log "ERROR: cannot find ssh, exiting" ; exit 1 ; } 
-	command -v rsync >/dev/null 2>&1 && log-verbose "INFO: found rsync: $(command -v rsync)" || { log "ERROR: cannot find rsync, exiting" ; exit 1 ; }
+	command -v logger >/dev/null 2>&1 && log-verbose "INFO: found logger: $(command -v logger)" || { unset RSYNC_BACKUP_SYSLOG ; log "ERROR: cannot find logger, logging to STDOUT" } 
+	command -v ssh    >/dev/null 2>&1 && log-verbose "INFO: found ssh: $(command -v ssh)"       || { log "ERROR: cannot find ssh, exiting"   ; exit 1 } 
+	command -v rsync  >/dev/null 2>&1 && log-verbose "INFO: found rsync: $(command -v rsync)"   || { log "ERROR: cannot find rsync, exiting" ; exit 1 }
 }
 
 ##### This function checks for battery charge and AC adapter state, and tries to find wakeup events
