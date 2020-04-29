@@ -3,18 +3,18 @@
 # JOBNAME will be used as folder name on remote host
 JOBNAME="backup-$(hostname)"
 
-# Remote host name 
+# Source directory and excludes
+BACKUPSRC="/"
+EXCLUDES=( tmp proc sys run dev home/aj/Documents home/aj/Photos home/aj/Pictures home/aj/Profile )
+
+# Destination directory
+BACKUPDST="/home/backup/"
+# Remote hostname 
 SERVER="fs.lan"
-# This user well be used to connect to remote host
-USER="root"
-# Path to make backup to
-SERVERROOT="/home/backup/"
+# This user will be used to connect to remote host
+RUSER="root"
 # Path to rsync binary on remote host
 REMOTERSYNCPATH="/usr/bin/rsync"
-
-# What to backup
-BACKUPPATH="/"
-EXCLUDES=( tmp proc sys run dev home/aj/Documents home/aj/Photos home/aj/Pictures home/aj/Profile )
 
 # Safe battery percentage - backup will not run under this percentage
 SAVEBATTERYLEVEL=95

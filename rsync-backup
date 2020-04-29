@@ -21,8 +21,8 @@ parse-arguments () {
 			-h|--help) usage ; exit 0 ;;
 			*) JOBFILES+=( "$ARG" ) ;;
 		esac
-	shift
-done
+	  shift
+  done
 }
 
 log () {
@@ -34,9 +34,11 @@ log-verbose () {
 }
 
 check-binaries () {
-	command -v logger >/dev/null 2>&1 && log-verbose "INFO: found logger: $(command -v logger)" || { unset RSYNC_BACKUP_SYSLOG ; log "ERROR: cannot find logger, logging to STDOUT" } 
-	command -v ssh    >/dev/null 2>&1 && log-verbose "INFO: found ssh: $(command -v ssh)"       || { log "ERROR: cannot find ssh, exiting"   ; exit 1 } 
-	command -v rsync  >/dev/null 2>&1 && log-verbose "INFO: found rsync: $(command -v rsync)"   || { log "ERROR: cannot find rsync, exiting" ; exit 1 }
+	command -v logger     >/dev/null 2>&1 && log-verbose "DEBUG: found logger: $(command -v logger)"         || { unset RSYNC_BACKUP_SYSLOG ; log "INFO: cannot find logger, logging to STDOUT" ; } 
+	command -v ssh        >/dev/null 2>&1 && log-verbose "DEBUG: found ssh: $(command -v ssh)"               || { log "ERROR: cannot find ssh, exiting"   ; exit 1 ; } 
+	command -v rsync      >/dev/null 2>&1 && log-verbose "DEBUG: found rsync: $(command -v rsync)"           || { log "ERROR: cannot find rsync, exiting" ; exit 1 ; }
+	command -v systemctl  >/dev/null 2>&1 && log-verbose "DEBUG: found systemctl: $(command -v systemctl)"   || { log-verbose "DEBUG: no systemctl in path" ; NOSYSTEMD=1 ; }
+	command -v journalctl >/dev/null 2>&1 && log-verbose "DEBUG: found journalctl: $(command -v journalctl)" || { log-verbose "DEBUG: no journalctl in path" ; NOSYSTEMD=1 ; }
 }
 
 ##### This function checks for battery charge and AC adapter state, and tries to find wakeup events
@@ -60,7 +62,7 @@ check-powerstate () {
 		fi
 		[[ ( "$BATTERYLEVEL" -lt "$SAVEBATTERYLEVEL" ) && ( "$ACONLINE" -gt 0 ) ]] && { log "ERROR: battery level is too low" ; exit 1 ; } 
 	else
-		log "INFO: no power supplies found"
+		log-verbose "DEBUG: no power supplies found"
 	fi
 	
 	if journalctl -S "10 minutes ago" | grep "Waking up from system sleep state S3" >/dev/null; then
@@ -71,35 +73,40 @@ check-powerstate () {
 	fi
 }
 
-source-jobfile () {
-	[ -f $@ ] && . $@ >/dev/null 2>&1 || { log "ERROR: cannot read jobfile: $@" && exit 1; }
-	[ -z "$JOBNAME" ] && { log "ERROR: JOBNAME not set, check $@" && exit 1; }
-	[ -z "$SERVER" ] && { log "ERROR: SERVER not set, check $@" && exit 1; }
-	[ -z "$USER" ] && { log "ERROR: USER not set, check $@" && exit 1; }
-	[ -z "$SERVERROOT" ] && { log "ERROR: SERVERROOT not set, check $@" && exit 1; }
-	[ -z "$REMOTERSYNCPATH" ] && { log "ERROR: REMOTERSYNCPATH not set, check $@" && exit 1; }
-	[ -z "$BACKUPPATH" ] && { log "ERROR: BACKUPPATH not set, check $@" && exit 1; }
-	[ -z "$EXCLUDES" ] && { log "ERROR: EXCLUDES not set, check $@" && exit 1; }
+read-jobfile () {
+	[ -f $@ ]                 && . $@ >/dev/null 2>&1 || { log "ERROR: cannot read jobfile: $@" && exit 1; }
+
+	[ -z "$JOBNAME" ]         && { log "ERROR: JOBNAME is not set, check jobfile $@"        && exit 1 ; }
+	[ -z "$BACKUPSRC" ]       && { log "ERROR: BACKUPPATH is not set, check jobfile $@"     && exit 1 ; }
+	[ -z "$BACKUPDST" ]       && { log "ERROR: BACKUPLOCATION is not set, check jobfile $@" && exit 1 ; }
+	RSYNCSTRING=" -aAXv --link-dest=../current --delete"
+	[ -z "$EXCLUDES" ]        || { 
+		EXCLUDELIST=""
+		for EXCLUDEPATH in ${EXCLUDES[*]} ; do
+			log-verbose "DEBUG: Excluded path: $EXCLUDEPATH"
+			EXCLUDELIST+=" --exclude $EXCLUDEPATH"
+		done
+		RSYNCSTRING+="$EXCLUDELIST"
+	}
+	[ -z "$REMOTERSYNCPATH" ] && RSYNCSTRING+=" --rsync-path=$REMOTERSYNCPATH"
+  
+  [ -z "$RUSER" ]           && REMOTESTRING="$RUSER@" || REMOTESTRING=""
+  [ -z "$SERVER" ]          && REMOTESTRING+="$SERVER:$BACKUPDST/$JOBNAME/" || REMOTESTRING+="$BACKUPDST/$JOBNAME/"
+  RSYNCSTRING+=" $BACKUPSRC $REMOTESTRING"
 }
 
 backup () {
 	log "INFO: Starting backup job $JOBNAME"
-	systemctl mask suspend.target
-	EXCLUDELIST=""
-	for EXCLUDEPATH in ${EXCLUDES[*]}; do
-		log-verbose "DEBUG: Excluded path: $EXCLUDEPATH"
-		EXCLUDELIST="$EXCLUDELIST --exclude $EXCLUDEPATH"
-	done
+	[ -z "$NOSYSTEMD" ] && systemctl mask suspend.target
 	BDATE=$(date +%Y-%m-%d-%H-%M-%S)
 	log-verbose "DEBUG: Backup date is $BDATE"
 	log-verbose "DEBUG: Running rsync"
-	if rsync -av --delete $EXCLUDELIST --link-dest=../current --rsync-path="$REMOTERSYNCPATH" "$BACKUPPATH" "$USER@$SERVER:$SERVERROOT/$JOBNAME/$BDATE/" ; then
-		log-verbose "DEBUG: sshing to renew symlink"
-		ssh "$USER@$SERVER" "cd $SERVERROOT/$JOBNAME; rm current; ln -sf $BDATE current"
+	if rsync "$RSYNCSTRING$BDATE/" ; then
+		[-z "$SERVER"] || log-verbose "DEBUG: sshing to renew symlink" ; ssh "$RUSER@$SERVER" "cd $BACKUPDST/$JOBNAME; rm current; ln -sf $BDATE current"
 	else
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
 	fi
-	systemctl unmask suspend.target
+	[ -z "$NOSYSTEMD" ] && systemctl unmask suspend.target
 }
 
 [ $# -gt 0 ] && parse-arguments $@ || { usage ; exit 1 ; }
@@ -108,10 +115,9 @@ check-powerstate
 
 for JOBFILE in ${JOBFILES[*]}; do
 	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file"  ; exit 1 ; }
-	source-jobfile $JOBFILE
-	if ping -c 1 "$SERVER" >/dev/null; then log-verbose "server online"
-	if backup; then log "INFO: $BACKUBJOB backup ended without errors"
-	else log "there was errors during backup"; fi
+	read-jobfile $JOBFILE
+	ping -c 1 "$SERVER" >/dev/null && log-verbose "DEBUG: Job $JOBNAME: server $SERVER online"
+	backup && log "INFO: Job $JOBNAME: backup ended without errors" || log "ERROR: Job $JOBNAME: there was errors during backup"; fi
 	else log-verbose "INFO: server did not respond our ping - assuming offline"; fi
 	log-verbose "setting RTC alarm back"
 done
