@@ -30,7 +30,8 @@ log () {
 }
 
 log-verbose () {
-	[ -z "$RSYNC_BACKUP_DEBUG" ] || log "$@"
+#	[ -z "$RSYNC_BACKUP_DEBUG" ] || log "$@"
+log "$@"
 }
 
 check-binaries () {
@@ -53,11 +54,11 @@ check-powerstate () {
 		fi
 		if [ -d /sys/class/power_supply/BAT1 ] ; then
 			log-verbose "DEBUG: Battery BAT1 present"
-			BAT1CAPACITY=$(cat /sys/class/power_supply/BAT0/capacity)
-			BAT0FULLENERGY=$(cat /sys/class/power_supply/BAT0/energy_full)
+			BAT1CAPACITY=$(cat /sys/class/power_supply/BAT1/capacity)
+			BAT0FULLENERGY=$(cat /sys/class/power_supply/BAT1/energy_full)
 			BAT1FULLENERGY=$(cat /sys/class/power_supply/BAT1/energy_full)
 			log-verbose "DEBUG: BAT1: $BAT1CAPACITY%"
-			BATTERYLEVEL=$(( $(BAT0FULLENERGY) * $(BATTERYLEVEL) / ($(BAT0FULLENERGY) + $(BAT1FULLENERGY)) + $(BAT1FULLENERGY) * $(BAT1CAPACITY) / ($(BAT0FULLENERGY) + $(BAT1FULLENERGY)) ))
+			BATTERYLEVEL=$(( "$BAT0FULLENERGY" * "$BATTERYLEVEL" / ("$BAT0FULLENERGY" + "$BAT1FULLENERGY") + "$BAT1FULLENERGY" * "$BAT1CAPACITY" / ("$BAT0FULLENERGY" + "$BAT1FULLENERGY") ))
 			log-verbose "DEBUG: overall: $BATTERYLEVEL%"
 		fi
 		[[ ( "$BATTERYLEVEL" -lt "$SAVEBATTERYLEVEL" ) && ( "$ACONLINE" -gt 0 ) ]] && { log "ERROR: battery level is too low" ; exit 1 ; } 
@@ -87,10 +88,10 @@ read-jobfile () {
 		done
 		RSYNCSTRING+="$EXCLUDELIST"
 	}
-	[ -z "$REMOTERSYNCPATH" ] && RSYNCSTRING+=" --rsync-path=$REMOTERSYNCPATH"
+	[ -z "$REMOTERSYNCPATH" ] || RSYNCSTRING+=" --rsync-path=$REMOTERSYNCPATH"
   
-  [ -z "$RUSER" ]           && REMOTESTRING="$RUSER@" || REMOTESTRING=""
-  [ -z "$SERVER" ]          && REMOTESTRING+="$SERVER:$BACKUPDST/$JOBNAME/" || REMOTESTRING+="$BACKUPDST/$JOBNAME/"
+  [ -z "$RUSER" ]           && REMOTESTRING="" || REMOTESTRING="$RUSER@"
+  [ -z "$SERVER" ]          && REMOTESTRING+="$BACKUPDST/$JOBNAME/" || REMOTESTRING+="$SERVER:$BACKUPDST/$JOBNAME/" 
   RSYNCSTRING+=" $BACKUPSRC $REMOTESTRING"
 }
 
@@ -99,8 +100,9 @@ backup () {
 	[ -z "$NOSYSTEMD" ] && systemctl mask suspend.target
 	BDATE=$(date +%Y-%m-%d-%H-%M-%S)
 	log-verbose "DEBUG: Backup date is $BDATE"
+	RSYNCSTRING+="$BDATE"
 	log-verbose "DEBUG: Running rsync"
-	if rsync "$RSYNCSTRING$BDATE/" ; then
+	if rsync $RSYNCSTRING ; then
 		[ -z "$SERVER"] || { log-verbose "DEBUG: sshing to renew symlink" ; ssh "$RUSER@$SERVER" "cd $BACKUPDST/$JOBNAME; rm current; ln -sf $BDATE current" ; }
 	else
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
@@ -113,17 +115,17 @@ check-binaries
 check-powerstate
 
 for JOBFILE in ${JOBFILES[*]}; do
-	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file"  ; exit 1 ; }
-	read-jobfile $JOBFILE
-	backup && log "INFO: Job $JOBNAME: backup ended without errors" || log "ERROR: Job $JOBNAME: there was errors during backup"
-	log-verbose "setting RTC alarm back"
+	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file" ; exit 1 ; }
+	read-jobfile "$JOBFILE"
+	backup
+	log-verbose "DEBUG: setting RTC alarm back"
 done
 
 if [[ $(date +%_H) -lt 2 ]]; then
-	log-verbose "earlier than 4 am - setting on today 2 am"
+	log-verbose "DEBUG: earlier than 2 am - setting on today 2 am"
 	rtcwake -t $(date +%s --date="today 2:01") -m no
 else
-	log-verbose "after  4 am - setting on tomorrow 2 am"
+	log-verbose "DEBUG: after  2 am - setting on tomorrow 2 am"
 	rtcwake -t $(date +%s --date="tomorrow 2:01") -m no
 fi
 
