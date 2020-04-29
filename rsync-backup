@@ -15,11 +15,11 @@ parse-arguments () {
 	while [[ $# -gt 0 ]]; do
     ARG="$1"
     case "$ARG" in
-			-c|--cron) RSYNC_BACKUP_SYSLOG=1 ;;
+			-c|--cron)    RSYNC_BACKUP_SYSLOG=1 ;;
 			-d|--dry-run) RSYNC_BACKUP_DRYRUN=1 ;;
-			-v|--debug) RSYNC_BACKUP_DEBUG=1 ;;
-			-h|--help) usage ; exit 0 ;;
-			*) JOBFILES+=( "$ARG" ) ;;
+			-v|--debug)   RSYNC_BACKUP_DEBUG=1 ;;
+			-h|--help)    usage ; exit 0 ;;
+			*)            JOBFILES+=( "$ARG" ) ;;
 		esac
 	  shift
   done
@@ -66,8 +66,7 @@ check-powerstate () {
 	fi
 	
 	if journalctl -S "10 minutes ago" | grep "Waking up from system sleep state S3" >/dev/null; then
-		WAKEDBYRTC=1
-		log-verbose "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC"
+		log-verbose "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC" && WAKEDBYRTC=1
 	else
 		log-verbose "DEBUG: RTC is not the case of wakeup"
 	fi
@@ -102,7 +101,7 @@ backup () {
 	log-verbose "DEBUG: Backup date is $BDATE"
 	log-verbose "DEBUG: Running rsync"
 	if rsync "$RSYNCSTRING$BDATE/" ; then
-		[-z "$SERVER"] || log-verbose "DEBUG: sshing to renew symlink" ; ssh "$RUSER@$SERVER" "cd $BACKUPDST/$JOBNAME; rm current; ln -sf $BDATE current"
+		[ -z "$SERVER"] || { log-verbose "DEBUG: sshing to renew symlink" ; ssh "$RUSER@$SERVER" "cd $BACKUPDST/$JOBNAME; rm current; ln -sf $BDATE current" ; }
 	else
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
 	fi
