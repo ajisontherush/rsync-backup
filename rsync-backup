@@ -115,7 +115,6 @@ check-powerstate
 for JOBFILE in ${JOBFILES[*]}; do
 	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file"  ; exit 1 ; }
 	read-jobfile $JOBFILE
-	ping -c 1 "$SERVER" >/dev/null && log-verbose "DEBUG: Job $JOBNAME: server $SERVER online"
 	backup && log "INFO: Job $JOBNAME: backup ended without errors" || log "ERROR: Job $JOBNAME: there was errors during backup"; fi
 	else log-verbose "INFO: server did not respond our ping - assuming offline"; fi
 	log-verbose "setting RTC alarm back"
