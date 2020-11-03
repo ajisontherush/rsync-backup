@@ -18,6 +18,10 @@ REMOTERSYNCPATH="/usr/bin/rsync"
 
 # Safe battery percentage - backup will not run under this percentage
 SAVEBATTERYLEVEL=95
+RUNONBATTERY=1
+SUSPEND=1
+USERTC=1
+BACKUPTIME="3:00"
 
 # Debug messages
 RSYNC_BACKUP_DEBUG=1

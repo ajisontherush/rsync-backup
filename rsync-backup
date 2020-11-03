@@ -66,11 +66,6 @@ check-powerstate () {
 		log-verbose "DEBUG: no power supplies found"
 	fi
 	
-	if journalctl -S "10 minutes ago" | grep "Waking up from system sleep state S3" >/dev/null; then
-		log-verbose "DEBUG: seems to be waked by RTC, setting var WAKEDBYRTC" && WAKEDBYRTC=1
-	else
-		log-verbose "DEBUG: RTC is not the case of wakeup"
-	fi
 }
 
 read-jobfile () {
@@ -79,7 +74,7 @@ read-jobfile () {
 	[ -z "$JOBNAME" ]         && { log "ERROR: JOBNAME is not set, check jobfile $@"        && exit 1 ; }
 	[ -z "$BACKUPSRC" ]       && { log "ERROR: BACKUPPATH is not set, check jobfile $@"     && exit 1 ; }
 	[ -z "$BACKUPDST" ]       && { log "ERROR: BACKUPLOCATION is not set, check jobfile $@" && exit 1 ; }
-	RSYNCSTRING=" -aAXv --link-dest=../current --delete"
+	RSYNCSTRING=" -avAX --link-dest=../current --delete --numeric-ids --fake-super"
 	[ -z "$EXCLUDES" ]        || { 
 		EXCLUDELIST=""
 		for EXCLUDEPATH in ${EXCLUDES[*]} ; do
@@ -112,23 +107,22 @@ backup () {
 
 [ $# -gt 0 ] && parse-arguments $@ || { usage ; exit 1 ; }
 check-binaries
-check-powerstate
 
 for JOBFILE in ${JOBFILES[*]}; do
 	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file" ; exit 1 ; }
 	read-jobfile "$JOBFILE"
+	check-powerstate
 	backup
-	log-verbose "DEBUG: setting RTC alarm back"
 done
 
-if [[ $(date +%_H) -lt 2 ]]; then
-	log-verbose "DEBUG: earlier than 2 am - setting on today 2 am"
-	rtcwake -t $(date +%s --date="today 2:01") -m no
+if [[ "$USERTC" -eq "1" ]] && [[ $(date +%_H) -lt $(echo $BACKUPTIME | cut -d: -f 1) ]]; then
+	log-verbose "DEBUG: setting rtcwake on today $BACKUPTIME minus 3 min"
+	rtcwake -t $(date +%s --date="today $BACKUPTIME - 3 min") -m no
 else
-	log-verbose "DEBUG: after  2 am - setting on tomorrow 2 am"
-	rtcwake -t $(date +%s --date="tomorrow 2:01") -m no
+	log-verbose "DEBUG: setting rtcwake on tomorrow $BACKUPTIME minus 3 min"
+	rtcwake -t $(date +%s --date="tomorrow $BACKUPTIME - 3 min") -m no
 fi
 
-if cat /proc/acpi/button/lid/LID/state|grep closed > /dev/null; then
+if [[ "$SUSPEND" -eq "1" ]] && cat /proc/acpi/button/lid/LID/state|grep closed > /dev/null; then
 	sh -c "sleep 5; systemctl suspend" & 
 fi
