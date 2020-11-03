@@ -98,7 +98,7 @@ backup () {
 	RSYNCSTRING+="$BDATE"
 	log-verbose "DEBUG: Running rsync"
 	if rsync $RSYNCSTRING ; then
-		[ -z "$SERVER"] || { log-verbose "DEBUG: sshing to renew symlink" ; ssh "$RUSER@$SERVER" "cd $BACKUPDST/$JOBNAME; rm current; ln -sf $BDATE current" ; }
+		[ -z "$SERVER" ] || { log-verbose "DEBUG: sshing to renew symlink" ; ssh "$RUSER@$SERVER" "cd $BACKUPDST/$JOBNAME; rm current; ln -sf $BDATE current" ; }
 	else
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
 	fi
