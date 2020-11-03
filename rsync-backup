@@ -74,7 +74,7 @@ read-jobfile () {
 	[ -z "$JOBNAME" ]         && { log "ERROR: JOBNAME is not set, check jobfile $@"        && exit 1 ; }
 	[ -z "$BACKUPSRC" ]       && { log "ERROR: BACKUPPATH is not set, check jobfile $@"     && exit 1 ; }
 	[ -z "$BACKUPDST" ]       && { log "ERROR: BACKUPLOCATION is not set, check jobfile $@" && exit 1 ; }
-	RSYNCSTRING=" -avAX --link-dest=../current --delete --numeric-ids --fake-super"
+	RSYNCSTRING=" -avA --link-dest=../current --delete --numeric-ids --fake-super"
 	[ -z "$EXCLUDES" ]        || { 
 		EXCLUDELIST=""
 		for EXCLUDEPATH in ${EXCLUDES[*]} ; do
