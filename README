@@ -13,7 +13,7 @@ TODO ( + mark for completed)
 + FIX: /tmp/donotsleeponlidclose doesn't work on systemd
 	systemctl mask suspend.target should work
 + add laptop battery charge level
-- move rtc wake configuration to jobfile
++ move rtc wake configuration to jobfile
 - drop all job vars before loading jobfile
 - add backup rotation function
 - make use of sudo on remote machine
