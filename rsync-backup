@@ -38,8 +38,8 @@ check-binaries () {
 	command -v logger     >/dev/null 2>&1 && log-verbose "DEBUG: found logger: $(command -v logger)"         || { unset RSYNC_BACKUP_SYSLOG ; log "INFO: cannot find logger, logging to STDOUT" ; } 
 	command -v ssh        >/dev/null 2>&1 && log-verbose "DEBUG: found ssh: $(command -v ssh)"               || { log "ERROR: cannot find ssh, exiting"   ; exit 1 ; } 
 	command -v rsync      >/dev/null 2>&1 && log-verbose "DEBUG: found rsync: $(command -v rsync)"           || { log "ERROR: cannot find rsync, exiting" ; exit 1 ; }
-	command -v systemctl  >/dev/null 2>&1 && log-verbose "DEBUG: found systemctl: $(command -v systemctl)"   || { log-verbose "DEBUG: no systemctl in path" ; NOSYSTEMD=1 ; }
-	command -v journalctl >/dev/null 2>&1 && log-verbose "DEBUG: found journalctl: $(command -v journalctl)" || { log-verbose "DEBUG: no journalctl in path" ; NOSYSTEMD=1 ; }
+	command -v systemctl  >/dev/null 2>&1 && log-verbose "DEBUG: found systemctl: $(command -v systemctl)"   || { log-verbose "DEBUG: no systemctl in path, systemd disabled" ; NOSYSTEMD=1 ; }
+	command -v journalctl >/dev/null 2>&1 && log-verbose "DEBUG: found journalctl: $(command -v journalctl)" || { log-verbose "DEBUG: no journalctl in path, systemd disabled" ; NOSYSTEMD=1 ; }
 }
 
 ##### This function checks for battery charge and AC adapter state, and tries to find wakeup events
@@ -92,7 +92,25 @@ read-jobfile () {
 
 backup () {
 	log "INFO: Starting backup job $JOBNAME"
-	[ -z "$NOSYSTEMD" ] && systemctl mask suspend.target
+
+	if [ -z "$NOSYSTEMD" ] ; then
+		if systemctl status suspend.target | grep mask > /dev/null ; then
+			log-verbose "DEBUG: suspend.target already masked"
+			NOUNMASKSUSPEND=1
+		else
+			log-verbose "DEBUG: Masking suspend.target"
+			systemctl mask suspend.target
+		fi
+	else
+		if [ -e /tmp/donotsleeponlidclose ] ; then
+			log-verbose "DEBUG: /tmp/donotsleeponlidclose already set"
+			NOUNMASKSUSPEND=1
+		else
+			log-verbose "DEBUG: setting /tmp/donotsleeponlidclose"
+			touch /tmp/donotsleeponlidclose
+		fi
+	fi
+
 	BDATE=$(date +%Y-%m-%d-%H-%M-%S)
 	log-verbose "DEBUG: Backup date is $BDATE"
 	RSYNCSTRING+="$BDATE"
@@ -102,7 +120,14 @@ backup () {
 	else
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
 	fi
-	[ -z "$NOSYSTEMD" ] && systemctl unmask suspend.target
+	
+	if ! [ -z "$NOUNMASKSUSPEND" ] ; then 
+		if [ -z "$NOSYSTEMD" ] ; then
+			systemctl unmask suspend.target && log-verbose "DEBUG: suspend.targed unmasked"
+		else
+			rm /tmp/donotsleeponlidclose && log-verbose "DEBUG: /tmp/donotsleeponlidclose removed"
+		fi
+	fi
 }
 
 [ $# -gt 0 ] && parse-arguments $@ || { usage ; exit 1 ; }

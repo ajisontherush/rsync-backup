@@ -12,6 +12,8 @@ TODO ( + mark for completed)
 + parse commandline arguments
 + FIX: /tmp/donotsleeponlidclose doesn't work on systemd
 	systemctl mask suspend.target should work
++ FIX: added check if suspend.target already masked or 
+  /tmp/donotsleeponlidclose already present
 + add laptop battery charge level
 + move rtc wake configuration to jobfile
 - drop all job vars before loading jobfile
