@@ -18,3 +18,10 @@ TODO ( + mark for completed)
 - add backup rotation function
 - make use of sudo on remote machine
 - make restore script
+
+Tips:
+
+Place your server ssh key in /etc/ssh/ssh_known_hosts
+Selinux permissions:
+# setsebool -P rsync_client 1
+# setsebool -P rsync_export_all_ro 1
