@@ -1,0 +1,9 @@
+[Unit]
+Description=Backup using rsync
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+Restart=no
+ExecStart=/bin/sh -c "/home/aj/Documents/Code/rsync-backup/rsync-backup /home/aj/Documents/Code/rsync-backup/test-jobfile"
+Type=exec
