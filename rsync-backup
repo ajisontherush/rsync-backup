@@ -48,16 +48,14 @@ check-powerstate () {
 		log-verbose "DEBUG: Found AC power supply"
 		ACONLINE=$(cat /sys/class/power_supply/AC/online)
 		if [ -d /sys/class/power_supply/BAT0 ] ; then
-			log-verbose "DEBUG: Battery BAT0 present"
 			BATTERYLEVEL=$(cat /sys/class/power_supply/BAT0/capacity)
-			log-verbose "DEBUG: BAT0: $BATTERYLEVEL%"
+			log-verbose "DEBUG: Battery BAT0 present, $BATTERYLEVEL%"
 		fi
 		if [ -d /sys/class/power_supply/BAT1 ] ; then
-			log-verbose "DEBUG: Battery BAT1 present"
 			BAT1CAPACITY=$(cat /sys/class/power_supply/BAT1/capacity)
+			log-verbose "DEBUG: Battery BAT1 present, $BAT1CAPACITY%"
 			BAT0FULLENERGY=$(cat /sys/class/power_supply/BAT1/energy_full)
 			BAT1FULLENERGY=$(cat /sys/class/power_supply/BAT1/energy_full)
-			log-verbose "DEBUG: BAT1: $BAT1CAPACITY%"
 			BATTERYLEVEL=$(( "$BAT0FULLENERGY" * "$BATTERYLEVEL" / ("$BAT0FULLENERGY" + "$BAT1FULLENERGY") + "$BAT1FULLENERGY" * "$BAT1CAPACITY" / ("$BAT0FULLENERGY" + "$BAT1FULLENERGY") ))
 			log-verbose "DEBUG: overall: $BATTERYLEVEL%"
 		fi
