@@ -85,9 +85,9 @@ read-jobfile () {
 	}
 	[ -z "$REMOTERSYNCPATH" ] || RSYNCSTRING+=" --rsync-path=$REMOTERSYNCPATH"
   
-  [ -z "$RUSER" ]           && REMOTESTRING="" || REMOTESTRING="$RUSER@"
-  [ -z "$SERVER" ]          && REMOTESTRING+="$BACKUPDST/$JOBNAME/" || REMOTESTRING+="$SERVER:$BACKUPDST/$JOBNAME/" 
-  RSYNCSTRING+=" $BACKUPSRC $REMOTESTRING"
+	[ -z "$RUSER" ]           && REMOTESTRING="" || REMOTESTRING="$RUSER@"
+	[ -z "$SERVER" ]          && REMOTESTRING+="$BACKUPDST/$JOBNAME/" || REMOTESTRING+="$SERVER:$BACKUPDST/$JOBNAME/" 
+	RSYNCSTRING+=" $BACKUPSRC $REMOTESTRING"
 }
 
 backup () {
@@ -121,7 +121,7 @@ backup () {
 		log "ERROR: backup job $JOBNAME: something went wrong with rsync"
 	fi
 	
-	if ! [ -z "$NOUNMASKSUSPEND" ] ; then 
+	if [ -z "$NOUNMASKSUSPEND" ] ; then 
 		if [ -z "$NOSYSTEMD" ] ; then
 			systemctl unmask suspend.target && log-verbose "DEBUG: suspend.targed unmasked"
 		else
@@ -132,6 +132,7 @@ backup () {
 
 [ $# -gt 0 ] && parse-arguments $@ || { usage ; exit 1 ; }
 check-binaries
+
 
 for JOBFILE in ${JOBFILES[*]}; do
 	[ -f "$JOBFILE" ] || { log "ERROR: $JOBFILE is not a file" ; exit 1 ; }
