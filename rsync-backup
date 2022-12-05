@@ -141,10 +141,10 @@ done
 
 if [[ "$USERTC" -eq "1" ]] && [[ $(date +%_H) -lt $(echo $BACKUPTIME | cut -d: -f 1) ]]; then
 	log-verbose "DEBUG: setting rtcwake on today $BACKUPTIME minus 3 min"
-	rtcwake -t $(date +%s -ud "today $BACKUPTIME +0003") -m no
+	rtcwake -t $(date +%s --date="today $BACKUPTIME - 3 min") -m no
 else
 	log-verbose "DEBUG: setting rtcwake on tomorrow $BACKUPTIME minus 3 min"
-	rtcwake -t $(date +%s -ud "tomorrow $BACKUPTIME +0003") -m no
+	rtcwake -t $(date +%s --date="tomorrow $BACKUPTIME - 3 min") -m no
 fi
 
 if [[ "$SUSPEND" -eq "1" ]] && cat /proc/acpi/button/lid/LID/state|grep closed > /dev/null; then
