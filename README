@@ -16,6 +16,7 @@ TODO ( + mark for completed)
   /tmp/donotsleeponlidclose already present
 + add laptop battery charge level
 + move rtc wake configuration to jobfile
+- make use of systemd-inhibit
 - drop all job vars before loading jobfile
 - add backup rotation function
 - make use of sudo on remote machine
